@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { Icon } from "../components/ui";
+import { SignOutButton } from "../components/SignOutButton";
 
 const employeeNav = [
     { to: "/dashboard", label: "Overview", icon: "dashboard" },
@@ -18,8 +19,7 @@ const supportNav = [
 ];
 
 const MainLayout = () => {
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
+    const { user } = useAuth();
     const location = useLocation();
     const [menuOpen, setMenuOpen] = useState(false);
     const isSupport = user?.role === "IT Support";
@@ -33,11 +33,6 @@ const MainLayout = () => {
         window.addEventListener("keydown", onEscape);
         return () => window.removeEventListener("keydown", onEscape);
     }, [menuOpen]);
-
-    const signOut = () => {
-        logout();
-        navigate("/login", { replace: true });
-    };
 
     const activeTitle = location.pathname.startsWith("/tickets/")
         ? location.pathname === "/tickets/new" ? "New request" : "Ticket details"
@@ -59,7 +54,7 @@ const MainLayout = () => {
             <p className="sidebar-label">Account</p>
             <nav className="side-nav" aria-label="Account">
                 <NavLink to="/profile" onClick={() => setMenuOpen(false)} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}><Icon name="user" size={18} />My profile</NavLink>
-                <button type="button" className="nav-link w-full text-left" onClick={signOut}><Icon name="logout" size={18} />Sign out</button>
+                <SignOutButton className="nav-link w-full text-left" />
             </nav>
 
             <div className="sidebar-bottom">
