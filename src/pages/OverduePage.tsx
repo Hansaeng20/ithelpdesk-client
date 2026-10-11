@@ -1,217 +1,27 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-
 import api from "../services/api";
+import { EmptyState, ErrorState, Icon, LoadingState, PageHeader, PriorityBadge, StatusBadge } from "../components/ui";
+import { formatDate } from "../utils/tickets";
 import type { Ticket } from "../types";
-
-interface TicketListResponse {
-    success: boolean;
-    count: number;
-    tickets: Ticket[];
-}
 
 const OverduePage = () => {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-
+    const load = useCallback(async () => { try { setLoading(true); setError(""); const response = await api.get<{ tickets: Ticket[] }>("/tickets/overdue"); setTickets(response.data.tickets); } catch (err) { console.error(err); setError("Unable to load overdue tickets."); } finally { setLoading(false); } }, []);
     useEffect(() => {
-        const fetchOverdueTickets = async () => {
-            try {
-                setLoading(true);
-                setError("");
-
-                const response =
-                    await api.get<TicketListResponse>("/tickets/overdue");
-
-                setTickets(response.data.tickets);
-            } catch (err) {
-                console.error(err);
-                setError("Unable to load overdue tickets.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchOverdueTickets();
+        let active = true;
+        api.get<{ tickets: Ticket[] }>("/tickets/overdue").then(response => {
+            if (active) setTickets(response.data.tickets);
+        }).catch(err => {
+            console.error(err);
+            if (active) setError("Unable to load overdue tickets.");
+        }).finally(() => { if (active) setLoading(false); });
+        return () => { active = false; };
     }, []);
 
-    const formatDate = (date: string) => {
-        return new Date(date).toLocaleString();
-    };
-
-    return (
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="mb-8">
-                <p className="text-sm font-medium text-red-600">
-                    SLA Monitoring
-                </p>
-
-                <h1 className="mt-1 text-3xl font-bold text-slate-900">
-                    Overdue Tickets
-                </h1>
-
-                <p className="mt-2 text-slate-500">
-                    Tickets that have passed their SLA deadline and are still unresolved.
-                </p>
-            </div>
-
-            {loading && (
-                <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-                    <p className="text-sm text-slate-500">
-                        Loading overdue tickets...
-                    </p>
-                </div>
-            )}
-
-            {!loading && error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-                    <p className="text-sm text-red-700">
-                        {error}
-                    </p>
-                </div>
-            )}
-
-            {!loading && !error && tickets.length === 0 && (
-                <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600">
-                        ✓
-                    </div>
-
-                    <h2 className="mt-4 text-lg font-semibold text-slate-900">
-                        No overdue tickets
-                    </h2>
-
-                    <p className="mt-2 text-sm text-slate-500">
-                        All active tickets are currently within their SLA deadlines.
-                    </p>
-                </div>
-            )}
-
-            {!loading && !error && tickets.length > 0 && (
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead className="border-b border-slate-200 bg-slate-50">
-                                <tr>
-                                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Ticket
-                                    </th>
-
-                                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Title
-                                    </th>
-
-                                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Priority
-                                    </th>
-
-                                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Status
-                                    </th>
-
-                                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Due
-                                    </th>
-
-                                    <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            <tbody className="divide-y divide-slate-100">
-                                {tickets.map((ticket) => (
-                                    <tr
-                                        key={ticket._id}
-                                        className="hover:bg-slate-50"
-                                    >
-                                        <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-blue-600">
-                                            {ticket.ticketNumber}
-                                        </td>
-
-                                        <td className="px-6 py-4">
-                                            <p className="max-w-xs truncate text-sm font-medium text-slate-900">
-                                                {ticket.title}
-                                            </p>
-
-                                            <p className="mt-1 text-xs text-slate-500">
-                                                {ticket.department?.name || "No department"}
-                                            </p>
-                                        </td>
-
-                                        <td className="px-6 py-4">
-                                            <PriorityBadge priority={ticket.priority} />
-                                        </td>
-
-                                        <td className="px-6 py-4">
-                                            <StatusBadge status={ticket.status} />
-                                        </td>
-
-                                        <td className="whitespace-nowrap px-6 py-4">
-                                            <p className="text-sm font-medium text-red-600">
-                                                {formatDate(ticket.dueAt)}
-                                            </p>
-
-                                            <p className="mt-1 text-xs text-slate-400">
-                                                SLA: {ticket.slaHours} hours
-                                            </p>
-                                        </td>
-
-                                        <td className="px-6 py-4 text-right">
-                                            <Link
-                                                to={`/tickets/${ticket._id}`}
-                                                className="text-sm font-semibold text-blue-600 hover:text-blue-800"
-                                            >
-                                                View
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-interface PriorityBadgeProps {
-    priority: Ticket["priority"];
-}
-
-const PriorityBadge = ({
-    priority,
-}: PriorityBadgeProps) => {
-    const styles = {
-        Low: "bg-slate-100 text-slate-700",
-        Medium: "bg-blue-100 text-blue-700",
-        High: "bg-orange-100 text-orange-700",
-        Critical: "bg-red-100 text-red-700",
-    };
-
-    return (
-        <span
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${styles[priority]}`}
-        >
-            {priority}
-        </span>
-    );
-};
-
-interface StatusBadgeProps {
-    status: Ticket["status"];
-}
-
-const StatusBadge = ({
-    status,
-}: StatusBadgeProps) => {
-    return (
-        <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-            {status}
-        </span>
-    );
+    return <div className="page"><PageHeader eyebrow="SLA monitoring" title="Overdue tickets" description="Unresolved requests that have passed their service deadline, sorted by due date." action={<button type="button" className="btn btn-outline" onClick={load}><Icon name="refresh" size={16} />Refresh</button>} />{loading ? <div className="panel"><LoadingState label="Loading overdue tickets..." /></div> : error ? <ErrorState message={error} retry={load} /> : <section className="panel overflow-hidden"><div className="panel-head"><div><h2>Needs attention</h2><p>{tickets.length} {tickets.length === 1 ? "request" : "requests"} past the deadline</p></div><span className="inline-grid place-items-center w-9 h-9 rounded-xl bg-rose-50 text-rose-600"><Icon name="alert" size={18} /></span></div>{tickets.length === 0 ? <EmptyState icon="check" title="All caught up" description="No active tickets are past their SLA deadline." /> : <><div className="table-wrap hidden md:block"><table className="data-table"><thead><tr><th>Ticket</th><th>Request</th><th>Priority</th><th>Status</th><th>Due date</th><th aria-label="View" /></tr></thead><tbody>{tickets.map(ticket => <tr key={ticket._id}><td><Link className="text-link" to={`/tickets/${ticket._id}`}>{ticket.ticketNumber}</Link></td><td><span className="cell-title">{ticket.title}</span><span className="cell-sub">{ticket.department?.name ?? "No department"}</span></td><td><PriorityBadge priority={ticket.priority} /></td><td><StatusBadge status={ticket.status} /></td><td className="text-rose-600! font-bold">{formatDate(ticket.dueAt, true)}</td><td><Link to={`/tickets/${ticket._id}`} className="text-link" aria-label={`View ${ticket.ticketNumber}`}><Icon name="chevronRight" size={16} /></Link></td></tr>)}</tbody></table></div><div className="md:hidden divide-y divide-slate-100">{tickets.map(ticket => <Link key={ticket._id} to={`/tickets/${ticket._id}`} className="block p-5 hover:bg-slate-50"><span className="text-[10px] font-bold text-indigo-500">{ticket.ticketNumber}</span><strong className="block mt-1 text-sm text-slate-800">{ticket.title}</strong><span className="block mt-2 text-xs font-bold text-rose-600">Due {formatDate(ticket.dueAt, true)}</span><span className="flex gap-2 mt-3"><PriorityBadge priority={ticket.priority} /><StatusBadge status={ticket.status} /></span></Link>)}</div></>}</section>}</div>;
 };
 
 export default OverduePage;

@@ -1,19 +1,14 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
+import { LoadingState } from "./ui";
 
 const ProtectedRoute = () => {
     const { user, loading } = useAuth();
     const location = useLocation();
 
     if (loading) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50">
-                <p className="text-sm text-slate-500">
-                    Loading...
-                </p>
-            </div>
-        );
+        return <div className="min-h-screen grid place-items-center"><LoadingState label="Restoring your workspace..." /></div>;
     }
 
     if (!user) {

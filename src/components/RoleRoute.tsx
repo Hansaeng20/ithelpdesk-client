@@ -1,7 +1,8 @@
 import { Navigate, Outlet } from "react-router-dom";
 
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import type { UserRole } from "../services/authService";
+import { LoadingState } from "./ui";
 
 interface RoleRouteProps {
     allowedRoles: UserRole[];
@@ -13,13 +14,7 @@ const RoleRoute = ({
     const { user, loading } = useAuth();
 
     if (loading) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50">
-                <p className="text-sm text-slate-500">
-                    Loading...
-                </p>
-            </div>
-        );
+        return <div className="min-h-screen grid place-items-center"><LoadingState label="Checking access..." /></div>;
     }
 
     if (!user) {

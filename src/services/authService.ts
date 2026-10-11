@@ -33,6 +33,17 @@ export interface RegisterData {
     department: string;
 }
 
+interface CurrentUserResponse {
+    success: boolean;
+    user: {
+        _id: string;
+        name: string;
+        email: string;
+        role: UserRole;
+        department?: AuthUser["department"];
+    };
+}
+
 interface RegisterResponse {
     success: boolean;
     message: string;
@@ -60,4 +71,10 @@ export const registerUser = async (
     );
 
     return response.data;
+};
+
+export const getCurrentUser = async (): Promise<AuthUser> => {
+    const response = await api.get<CurrentUserResponse>("/auth/me");
+    const { _id, name, email, role, department } = response.data.user;
+    return { id: _id, name, email, role, department };
 };

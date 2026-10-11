@@ -1,285 +1,55 @@
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { useTickets } from "../hooks/useTickets";
+import { EmptyState, ErrorState, Icon, LoadingState, PageHeader, PriorityBadge, StatusBadge } from "../components/ui";
+import { formatDate, getSlaState, slaLabel } from "../utils/tickets";
+import type { Ticket } from "../types";
+
+function Metric({ label, value, note, icon, tone = "indigo" }: { label: string; value: number; note: string; icon: string; tone?: string }) {
+    const tones: Record<string, string> = { indigo: "text-indigo-600 bg-indigo-50", teal: "text-teal-700 bg-teal-50", amber: "text-amber-700 bg-amber-50", rose: "text-rose-600 bg-rose-50" };
+    return <div className="metric-card"><div className="metric-top"><span>{label}</span><span className={`metric-icon ${tones[tone]}`}><Icon name={icon} size={18} /></span></div><div className="metric-value">{value}</div><div className="metric-note">{note}</div></div>;
+}
 
 const DashboardPage = () => {
     const { user } = useAuth();
-    const { tickets, loading, error } = useTickets();
+    const { tickets, loading, error, refetch } = useTickets();
+    const isSupport = user?.role === "IT Support";
+    const firstName = user?.name?.split(" ")[0] || "there";
+    const open = tickets.filter(ticket => ticket.status === "Open").length;
+    const progress = tickets.filter(ticket => ticket.status === "In Progress").length;
+    const resolved = tickets.filter(ticket => ticket.status === "Resolved").length;
+    const overdue = tickets.filter(ticket => getSlaState(ticket.dueAt, ticket.status) === "overdue").length;
+    const recent = tickets.slice(0, 5);
+    const urgent = tickets.filter(ticket => ["overdue", "due-soon"].includes(getSlaState(ticket.dueAt, ticket.status))).sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime()).slice(0, 3);
 
-    const isITSupport = user?.role === "IT Support";
+    return <div className="page">
+        <PageHeader eyebrow={isSupport ? "Support command center" : "Your workspace"} title={`Good day, ${firstName}.`} description={isSupport ? "A clear view of your queue and what needs attention next." : "Your requests, updates, and deadlines in one calm workspace."} action={!isSupport && <Link to="/tickets/new" className="btn btn-primary"><Icon name="plus" size={17} />New request</Link>} />
 
-    const openCount = tickets.filter(
-        (ticket) => ticket.status === "Open",
-    ).length;
-
-    const inProgressCount = tickets.filter(
-        (ticket) => ticket.status === "In Progress",
-    ).length;
-
-    const resolvedCount = tickets.filter(
-        (ticket) => ticket.status === "Resolved",
-    ).length;
-
-    const overdueCount = tickets.filter(
-        (ticket) =>
-            new Date(ticket.dueAt) < new Date() &&
-            !["Resolved", "Cancelled"].includes(ticket.status),
-    ).length;
-
-    const recentTickets = tickets.slice(0, 5);
-
-    return (
-        <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-6 lg:px-8">
-            {/* Page Header */}
-            <div className="mb-8">
-                <p className="text-sm font-medium text-blue-600">
-                    {isITSupport ? "Overview" : "My Requests"}
-                </p>
-
-                <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-                    {isITSupport
-                        ? "Helpdesk Dashboard"
-                        : "My IT Requests"}
-                </h1>
-
-                <p className="mt-2 text-sm text-slate-500">
-                    {isITSupport
-                        ? "Monitor ticket activity and service performance."
-                        : "Track your support requests and their current status."}
-                </p>
+        {loading ? <div className="panel"><LoadingState label="Loading your dashboard..." /></div> : error ? <ErrorState message={error} retry={refetch} /> : <>
+            <div className="metric-grid">
+                <Metric label={isSupport ? "Open tickets" : "Open requests"} value={open} note="Waiting to be picked up" icon="tickets" />
+                <Metric label="In progress" value={progress} note="Work is underway" icon="refresh" tone="amber" />
+                <Metric label="Resolved" value={resolved} note="Successfully completed" icon="check" tone="teal" />
+                <Metric label={isSupport ? "Overdue" : "All requests"} value={isSupport ? overdue : tickets.length} note={isSupport ? "Need prompt attention" : "Your submitted tickets"} icon={isSupport ? "alert" : "dashboard"} tone={isSupport ? "rose" : "indigo"} />
             </div>
 
-            {/* Loading */}
-            {loading && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-                    <p className="text-sm text-slate-500">
-                        Loading dashboard...
-                    </p>
-                </div>
-            )}
+            <div className="grid gap-5 mt-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,.8fr)]">
+                <section className="panel overflow-hidden">
+                    <div className="panel-head"><div><h2>{isSupport ? "Recent activity" : "Your latest requests"}</h2><p>{isSupport ? "Newest tickets across the organization" : "Follow the progress of your support requests"}</p></div><Link to="/tickets" className="text-link">View all <Icon name="arrowRight" size={15} /></Link></div>
+                    {recent.length === 0 ? <EmptyState icon="tickets" title="Nothing here yet" description={isSupport ? "New requests will appear here as soon as they are submitted." : "Create your first request and track every update in one place."} action={!isSupport && <Link to="/tickets/new" className="btn btn-primary btn-small">Create a request</Link>} /> : <div className="divide-y divide-slate-100">{recent.map(ticket => <TicketRow key={ticket._id} ticket={ticket} showRequester={isSupport} />)}</div>}
+                </section>
 
-            {/* Error */}
-            {!loading && error && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-                    <p className="text-sm text-red-700">
-                        {error}
-                    </p>
-                </div>
-            )}
-
-            {/* Dashboard */}
-            {!loading && !error && (
-                <>
-                    {/* Statistics */}
-                    <div
-                        className={`grid gap-5 ${isITSupport
-                                ? "sm:grid-cols-2 lg:grid-cols-4"
-                                : "sm:grid-cols-3"
-                            }`}
-                    >
-                        <StatCard
-                            label={
-                                isITSupport
-                                    ? "Open"
-                                    : "Open Requests"
-                            }
-                            value={openCount}
-                            description={
-                                isITSupport
-                                    ? "Waiting for IT Support"
-                                    : "Waiting for support"
-                            }
-                        />
-
-                        <StatCard
-                            label={
-                                isITSupport
-                                    ? "In Progress"
-                                    : "Being Worked On"
-                            }
-                            value={inProgressCount}
-                            description="Currently being handled"
-                        />
-
-                        <StatCard
-                            label={
-                                isITSupport
-                                    ? "Resolved"
-                                    : "Resolved Requests"
-                            }
-                            value={resolvedCount}
-                            description={
-                                isITSupport
-                                    ? "Successfully resolved"
-                                    : "Successfully completed"
-                            }
-                        />
-
-                        {isITSupport && (
-                            <StatCard
-                                label="Overdue"
-                                value={overdueCount}
-                                description="Past SLA deadline"
-                            />
-                        )}
-                    </div>
-
-                    {/* Recent Tickets */}
-                    <section className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        {/* Section Header */}
-                        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-900">
-                                    {isITSupport
-                                        ? "Recent Tickets"
-                                        : "My Recent Requests"}
-                                </h2>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    {isITSupport
-                                        ? "Latest support requests."
-                                        : "Your latest IT support requests."}
-                                </p>
-                            </div>
-
-                            <Link
-                                to="/tickets"
-                                className="text-sm font-semibold text-blue-600 transition hover:text-blue-700"
-                            >
-                                View all
-                            </Link>
-                        </div>
-
-                        {/* Empty State */}
-                        {recentTickets.length === 0 ? (
-                            <div className="px-6 py-14 text-center">
-                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                                    <span className="text-lg text-slate-400">
-                                        ✓
-                                    </span>
-                                </div>
-
-                                <h3 className="mt-4 text-sm font-semibold text-slate-900">
-                                    {isITSupport
-                                        ? "No tickets available"
-                                        : "No requests yet"}
-                                </h3>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    {isITSupport
-                                        ? "There are currently no support tickets to display."
-                                        : "You have not submitted any IT support requests yet."}
-                                </p>
-
-                                {!isITSupport && (
-                                    <Link
-                                        to="/tickets/new"
-                                        className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-                                    >
-                                        Create Ticket
-                                    </Link>
-                                )}
-                            </div>
-                        ) : (
-                            /* Ticket List */
-                            <div className="divide-y divide-slate-100">
-                                {recentTickets.map((ticket) => (
-                                    <Link
-                                        key={ticket._id}
-                                        to={`/tickets/${ticket._id}`}
-                                        className="flex flex-col gap-3 px-6 py-4 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
-                                    >
-                                        <div className="min-w-0">
-                                            <p className="text-xs font-semibold text-blue-600">
-                                                {ticket.ticketNumber}
-                                            </p>
-
-                                            <p className="mt-1 truncate font-semibold text-slate-900">
-                                                {ticket.title}
-                                            </p>
-
-                                            {isITSupport && (
-                                                <p className="mt-1 text-xs text-slate-500">
-                                                    {ticket.requesterName}
-                                                </p>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center gap-3 sm:shrink-0">
-                                            <StatusBadge
-                                                status={ticket.status}
-                                            />
-
-                                            <span className="text-xs text-slate-400">
-                                                {new Date(
-                                                    ticket.createdAt,
-                                                ).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                </>
-            )}
-        </div>
-    );
+                <aside className="section-stack">
+                    <div className="panel panel-body support-callout"><span className="inline-grid place-items-center w-10 h-10 rounded-xl bg-white text-indigo-600 shadow-sm"><Icon name={isSupport ? "bolt" : "message"} size={20} /></span><h2 className="mt-4 text-[17px] font-extrabold tracking-tight text-slate-800">{isSupport ? "Stay ahead of the queue" : "Need help with something?"}</h2><p className="mt-2 text-[12px] leading-6 text-slate-500">{isSupport ? "Review tickets closest to their SLA deadline and keep every request moving." : "Tell us what is happening. We will keep the details and progress together for you."}</p><Link to={isSupport ? "/overdue" : "/tickets/new"} className="text-link mt-5">{isSupport ? "Review overdue" : "Create a request"}<Icon name="arrowRight" size={15} /></Link></div>
+                    <div className="panel overflow-hidden"><div className="panel-head"><div><h2>{isSupport ? "Needs attention" : "Coming up"}</h2><p>Closest active deadlines</p></div></div>{urgent.length === 0 ? <div className="p-6 text-center text-xs text-slate-500">All active tickets are on track.</div> : <div className="divide-y divide-slate-100">{urgent.map(ticket => <Link key={ticket._id} to={`/tickets/${ticket._id}`} className="block px-5 py-4 hover:bg-slate-50 transition"><span className="block text-[10px] font-bold text-indigo-500">{ticket.ticketNumber}</span><span className="block mt-1 text-xs font-bold text-slate-700 truncate">{ticket.title}</span><span className={`sla-pill mt-2 ${getSlaState(ticket.dueAt, ticket.status)}`}>{slaLabel(ticket.dueAt, ticket.status)} · {formatDate(ticket.dueAt, true)}</span></Link>)}</div>}</div>
+                </aside>
+            </div>
+        </>}
+    </div>;
 };
 
-interface StatCardProps {
-    label: string;
-    value: number;
-    description: string;
+function TicketRow({ ticket, showRequester }: { ticket: Ticket; showRequester: boolean }) {
+    return <Link to={`/tickets/${ticket._id}`} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 hover:bg-slate-50 transition"><div className="min-w-0"><span className="text-[10px] font-extrabold text-indigo-500">{ticket.ticketNumber}</span><strong className="block mt-1 text-xs text-slate-800 truncate">{ticket.title}</strong><span className="block mt-1 text-[11px] text-slate-400">{showRequester ? `${ticket.requesterName} · ` : ""}{formatDate(ticket.createdAt)}</span></div><div className="flex items-center gap-2"><PriorityBadge priority={ticket.priority} /><StatusBadge status={ticket.status} /><Icon name="chevronRight" size={15} className="text-slate-400" /></div></Link>;
 }
-
-const StatCard = ({
-    label,
-    value,
-    description,
-}: StatCardProps) => {
-    return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
-                {label}
-            </p>
-
-            <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-                {value}
-            </p>
-
-            <p className="mt-2 text-xs text-slate-400">
-                {description}
-            </p>
-        </div>
-    );
-};
-
-interface StatusBadgeProps {
-    status: string;
-}
-
-const StatusBadge = ({
-    status,
-}: StatusBadgeProps) => {
-    const styles: Record<string, string> = {
-        Open: "bg-blue-50 text-blue-700",
-        "In Progress": "bg-amber-50 text-amber-700",
-        Resolved: "bg-green-50 text-green-700",
-        Cancelled: "bg-red-50 text-red-700",
-    };
-
-    return (
-        <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${styles[status] ??
-                "bg-slate-100 text-slate-600"
-                }`}
-        >
-            {status === "Resolved"
-                ? "Resolved (Closed)"
-                : status}
-        </span>
-    );
-};
 
 export default DashboardPage;
