@@ -2,22 +2,29 @@
 import axios from "axios";
 
 const api = axios.create({
+<<<<<<< HEAD
     baseURL:
         import.meta.env.VITE_API_URL ||
         "http://localhost:5000/api",
     headers: {
         "Content-Type": "application/json",
     },
+=======
+  baseURL: import.meta.env.VITE_API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+>>>>>>> ae6ce47d316c96a4be26cd9fce3f642c5d481a9d
 });
 
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("helpdesk_token");
+  const token = localStorage.getItem("helpdesk_token");
 
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
 
-    return config;
+  return config;
 });
 
 export default api;
