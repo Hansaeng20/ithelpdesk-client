@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Icon } from "../components/ui";
+import { TypingHeadline } from "../components/TypingHeadline";
 
 const features = [
     { icon: "tickets", title: "Requests with context", text: "Keep the issue, owner, status, and updates together in a clear timeline." },
@@ -30,7 +31,7 @@ const LandingPage = () => (
             <section className="landing-hero">
                 <div className="landing-copy">
                     <p className="eyebrow">A smarter service workspace</p>
-                    <h1>IT support that feels <span>effortless.</span></h1>
+                    <TypingHeadline />
                     <p>Report issues, follow progress, and stay ahead of deadlines. A focused place for employees and IT teams to solve problems together.</p>
                     <div className="landing-actions">
                         <Link to="/register" className="btn btn-primary">Create an account <Icon name="arrowRight" size={16} /></Link>

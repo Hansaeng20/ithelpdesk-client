@@ -34,6 +34,7 @@ body { color: var(--ink); background: #0a101b; }
   mask-image: linear-gradient(90deg, transparent, #000 35%, transparent 100%);
 }
 .sidebar {
+  overflow-x: hidden;
   border-right: 1px solid #2c3c51;
   background: linear-gradient(170deg, #121d2d 0%, #111a2a 58%, #0b1522 100%);
   box-shadow: 12px 0 38px rgba(0, 0, 0, .13);
@@ -228,6 +229,10 @@ select.input option { color: #eaf3ff; background: #132235; }
 .landing-hero::before { content: ""; position: absolute; z-index: -1; inset: 0 -15vw; opacity: .28; pointer-events: none; background-image: linear-gradient(rgba(104, 147, 173, .14) 1px, transparent 1px), linear-gradient(90deg, rgba(104, 147, 173, .14) 1px, transparent 1px); background-size: 54px 54px; mask-image: radial-gradient(ellipse at 60% 48%, #000, transparent 70%); }
 .landing-hero h1 { color: #f4f9ff; }
 .landing-hero h1 span { background: linear-gradient(100deg, #9cb6ff, #70e1d9 72%, #b2f0cc); background-clip: text; color: transparent; }
+.landing-headline { min-height: 2.18em; }
+.landing-hero h1 .headline-display { display: block; color: #f4f9ff; background: none; background-clip: border-box; }
+.landing-hero h1 .headline-accent { background: linear-gradient(100deg, #9cb6ff, #70e1d9 72%, #b2f0cc); background-clip: text; color: transparent; }
+.landing-hero h1 .headline-caret { display: inline-block; width: 3px; height: .85em; margin-left: 3px; border-radius: 2px; vertical-align: -.08em; background: #86e8dc; background-clip: border-box; box-shadow: 0 0 13px rgba(134, 232, 220, .55); animation: typing-caret .9s steps(1) infinite; }
 .landing-hero p { color: #b4c6d9; }
 .landing-copy { animation: float-in .65s both; }
 .landing-proof { display: flex; flex-wrap: wrap; column-gap: 22px; row-gap: 9px; margin-top: 34px; color: #a9c0d1; font-size: 11px; }
@@ -311,11 +316,37 @@ select.input option { color: #eaf3ff; background: #132235; }
 .auth-footer a { color: #90e5dc; }
 .auth-footer a:hover { color: #bafff2; }
 
+/* Confirmation is portaled outside the scrolling sidebar. */
+.signout-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(3, 10, 21, .76); backdrop-filter: blur(9px); animation: signout-fade .25s ease-out both; }
+.signout-dialog { position: relative; isolation: isolate; overflow: hidden; width: min(100%, 465px); padding: 35px 32px 32px; border: 1px solid #4a7585; border-radius: 26px; color: #ecf7ff; background: radial-gradient(circle at 50% 0, rgba(65, 183, 184, .19), transparent 58%), linear-gradient(155deg, #1c3149, #111e31 75%); box-shadow: 0 34px 90px rgba(0, 4, 15, .55), inset 0 1px rgba(212, 251, 255, .12); text-align: center; animation: signout-appear .4s cubic-bezier(.18, .85, .25, 1.2) both; }
+.signout-dialog::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: .32; background-image: linear-gradient(rgba(141, 213, 226, .1) 1px, transparent 1px), linear-gradient(90deg, rgba(141, 213, 226, .1) 1px, transparent 1px); background-size: 36px 36px; mask-image: linear-gradient(#000, transparent 80%); pointer-events: none; }
+.signout-close { position: absolute; top: 17px; right: 17px; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #476075; border-radius: 9px; color: #b4cad8; background: #24374c; transition: color .2s, background .2s, transform .2s; }
+.signout-close:hover { color: #fff; background: #355469; transform: rotate(90deg); }
+.signout-visual { position: relative; display: grid; place-items: center; width: 126px; height: 126px; margin: 0 auto 21px; }
+.signout-ring { position: absolute; inset: 0; border: 1px solid rgba(132, 231, 219, .24); border-radius: 50%; }
+.signout-ring-outer { box-shadow: 0 0 0 14px rgba(126, 227, 216, .035), 0 0 40px rgba(93, 218, 206, .08); animation: signout-orbit 11s linear infinite; }
+.signout-ring-outer::before { content: ""; position: absolute; top: 8px; left: 21px; width: 8px; height: 8px; border-radius: 50%; background: #8aeee1; box-shadow: 0 0 16px #78ddd3; }
+.signout-ring-inner { inset: 20px; border-color: rgba(158, 202, 249, .24); animation: signout-orbit 8s linear infinite reverse; }
+.signout-ring-inner::after { content: ""; position: absolute; right: 1px; bottom: 11px; width: 6px; height: 6px; border-radius: 50%; background: #a6b9ff; box-shadow: 0 0 13px #9fb1ff; }
+.signout-visual-icon { display: grid; place-items: center; width: 62px; height: 62px; border: 1px solid #6ccbc4; border-radius: 19px; color: #bbfff0; background: linear-gradient(145deg, #315471, #28746f); box-shadow: 0 12px 25px rgba(20, 89, 97, .28), inset 0 1px rgba(255, 255, 255, .21); }
+.signout-spark { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #b1e9f1; box-shadow: 0 0 14px #a1e8eb; animation: beacon 2.5s ease-in-out infinite; }
+.signout-spark-one { left: -6px; top: 48px; }
+.signout-spark-two { right: -4px; bottom: 37px; animation-delay: 1.2s; }
+.signout-dialog .eyebrow { margin-bottom: 8px; }
+.signout-dialog h2 { margin: 0; color: #f3faff; font-size: clamp(25px, 4vw, 31px); font-weight: 800; letter-spacing: -.045em; }
+.signout-dialog p:not(.eyebrow) { max-width: 330px; margin: 11px auto 0; color: #b3c9db; font-size: 13px; line-height: 1.65; }
+.signout-actions { display: flex; justify-content: center; gap: 10px; margin-top: 29px; }
+.signout-actions .btn { flex: 1; }
+
 @keyframes ambient-drift { to { transform: translate(-45px, 80px) scale(1.3); } }
 @keyframes ring-breathe { to { transform: translateY(14px) scale(1.06); opacity: .72; } }
 @keyframes beacon { 50% { box-shadow: 0 0 0 6px rgba(83, 213, 166, .06), 0 0 20px rgba(90, 231, 177, .72); } }
 @keyframes preview-float { 50% { transform: rotate(-1deg) translateY(-10px); } }
 @keyframes pulse-bars { from { height: 5px; opacity: .4; } to { height: var(--bar-height); opacity: 1; } }
+@keyframes typing-caret { 50% { opacity: 0; } }
+@keyframes signout-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes signout-appear { from { opacity: 0; transform: translateY(18px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes signout-orbit { to { transform: rotate(360deg); } }
 
 @media (max-width: 850px) {
   .app-main::before { left: 0; }
@@ -332,8 +363,11 @@ select.input option { color: #eaf3ff; background: #132235; }
   .landing-preview { animation: none; }
   .preview-float-note { right: 9px; bottom: -19px; }
   .landing-flow-grid { grid-template-columns: 1fr; }
+  .signout-dialog { padding: 33px 21px 23px; }
+  .signout-actions { flex-direction: column-reverse; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .landing-headline { min-height: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
