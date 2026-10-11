@@ -1,81 +1,78 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/useAuth";
+import { Icon } from "../components/ui";
 
-const baseNavItems = [
-    { to: "/dashboard", label: "Dashboard" },
-    { to: "/tickets", label: "My Tickets" },
-    { to: "/profile", label: "Profile" },
+const employeeNav = [
+    { to: "/dashboard", label: "Overview", icon: "dashboard" },
+    { to: "/tickets", label: "My tickets", icon: "tickets" },
+    { to: "/tickets/new", label: "New request", icon: "plus" },
 ];
 
-const supportNavItems = [
-    { to: "/dashboard", label: "Dashboard" },
-    { to: "/tickets", label: "All Tickets" },
-    { to: "/overdue", label: "Overdue" },
-    { to: "/analytics", label: "Analytics" },
-    { to: "/departments", label: "Departments" },
-    { to: "/profile", label: "Profile" },
+const supportNav = [
+    { to: "/dashboard", label: "Overview", icon: "dashboard" },
+    { to: "/tickets", label: "All tickets", icon: "tickets" },
+    { to: "/overdue", label: "Overdue", icon: "clock" },
+    { to: "/analytics", label: "Analytics", icon: "analytics" },
+    { to: "/departments", label: "Departments", icon: "building" },
 ];
 
 const MainLayout = () => {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [menuOpen, setMenuOpen] = useState(false);
+    const isSupport = user?.role === "IT Support";
+    const nav = isSupport ? supportNav : employeeNav;
 
-    const isITSupport = user?.role === "IT Support";
+    useEffect(() => {
+        if (!menuOpen) return;
+        const onEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") setMenuOpen(false);
+        };
+        window.addEventListener("keydown", onEscape);
+        return () => window.removeEventListener("keydown", onEscape);
+    }, [menuOpen]);
 
-    const navItems = isITSupport
-        ? supportNavItems
-        : baseNavItems;
+    const signOut = () => {
+        logout();
+        navigate("/login", { replace: true });
+    };
 
-    return (
-        <div className="min-h-screen bg-slate-50">
-            <header className="border-b border-slate-200 bg-white">
-                <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+    const activeTitle = location.pathname.startsWith("/tickets/")
+        ? location.pathname === "/tickets/new" ? "New request" : "Ticket details"
+        : [...nav, { to: "/profile", label: "Profile", icon: "user" }].find(item => item.to === location.pathname)?.label ?? "IT Helpdesk";
 
-                    {/* Logo */}
-                    <Link
-                        to="/dashboard"
-                        className="flex items-center gap-3"
-                    >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 font-bold text-white">
-                            IT
-                        </div>
+    return <div className="app-shell">
+        <button className={`mobile-overlay ${menuOpen ? "open" : ""}`} type="button" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />
+        <aside className={`sidebar ${menuOpen ? "open" : ""}`} aria-label="Main navigation">
+            <Link to="/dashboard" className="brand" onClick={() => setMenuOpen(false)}>
+                <span className="brand-mark"><Icon name="bolt" size={23} /></span>
+                <span><span className="brand-name">IT Helpdesk</span><span className="brand-subtitle">Service workspace</span></span>
+            </Link>
 
-                        <div>
-                            <p className="font-bold text-slate-900">
-                                IT Helpdesk
-                            </p>
+            <p className="sidebar-label">Workspace</p>
+            <nav className="side-nav" aria-label="Workspace">
+                {nav.map(item => <NavLink key={item.to} to={item.to} end={item.to === "/tickets"} onClick={() => setMenuOpen(false)} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}><Icon name={item.icon} size={18} />{item.label}</NavLink>)}
+            </nav>
 
-                            <p className="text-xs text-slate-500">
-                                Support & Analytics
-                            </p>
-                        </div>
-                    </Link>
+            <p className="sidebar-label">Account</p>
+            <nav className="side-nav" aria-label="Account">
+                <NavLink to="/profile" onClick={() => setMenuOpen(false)} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}><Icon name="user" size={18} />My profile</NavLink>
+                <button type="button" className="nav-link w-full text-left" onClick={signOut}><Icon name="logout" size={18} />Sign out</button>
+            </nav>
 
-                    {/* Navigation */}
-                    <nav className="hidden items-center gap-1 md:flex">
-                        {navItems.map((item) => (
-                            <NavLink
-                                key={item.to}
-                                to={item.to}
-                                className={({ isActive }) =>
-                                    `rounded-lg px-3 py-2 text-sm font-medium transition ${isActive
-                                        ? "bg-blue-50 text-blue-700"
-                                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                                    }`
-                                }
-                            >
-                                {item.label}
-                            </NavLink>
-                        ))}
-                    </nav>
+            <div className="sidebar-bottom">
+                <div className="sidebar-help"><span className="sidebar-help-icon"><Icon name="shield" size={19} /></span><strong>Support you can follow</strong><p>Clear updates, deadlines, and progress in one place.</p></div>
+                <div className="sidebar-profile"><span className="avatar">{user?.name?.charAt(0).toUpperCase() || "U"}</span><span className="sidebar-profile-text"><strong>{user?.name}</strong><span>{user?.role}</span></span><Link to="/profile" aria-label="Open profile"><Icon name="chevronRight" size={17} /></Link></div>
+            </div>
+        </aside>
 
-                </div>
-            </header>
-
-            <main>
-                <Outlet />
-            </main>
+        <div className="app-main">
+            <header className="topbar"><div className="topbar-title"><button className="mobile-menu-btn" type="button" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(open => !open)}><Icon name={menuOpen ? "close" : "menu"} size={21} /></button><Icon name="sparkles" size={17} /><span>{activeTitle}</span></div><div className="topbar-right"><span>{new Intl.DateTimeFormat("en-PH", { month: "long", day: "numeric", year: "numeric" }).format(new Date())}</span><span className="topbar-pill">Workspace active</span></div></header>
+            <main><Outlet /></main>
         </div>
-    );
+    </div>;
 };
 
 export default MainLayout;

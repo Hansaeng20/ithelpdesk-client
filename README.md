@@ -1,75 +1,40 @@
-# React + TypeScript + Vite
+# IT Helpdesk client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React, TypeScript, Vite, and Tailwind workspace for employees and IT Support.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+From the `IT_Desk_Project` folder, start the API in `ithelpdesk-server` first. It requires MongoDB and the values in its `.env.example` file.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```powershell
+cd .\ithelpdesk-server
+npm install
+Copy-Item .env.example .env
+# Edit .env: set MONGO_URI and JWT_SECRET (and support credentials if needed).
+npm run seed:departments
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+In a second terminal:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```powershell
+cd .\ithelpdesk-client
+npm install
+npm run dev
 ```
+
+Open the local URL printed by Vite, usually `http://localhost:5173`. The development server proxies `/api` to `http://localhost:5000`. For a deployed client with an API on another origin, set `VITE_API_URL` before building. See `.env.example`.
+
+## Checks
+
+```powershell
+npm run build
+npm run lint
+```
+
+## Roles
+
+- Employees can register, submit requests, view and edit their own tickets, and post updates. Ticket priority is set on creation and then managed by IT Support.
+- IT Support can view the full queue, advance ticket status, monitor overdue requests, and view analytics and departments.
+
+Ticket status follows `Open → In Progress → Resolved`. SLA deadlines are calculated by the API from priority.

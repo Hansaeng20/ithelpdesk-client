@@ -47,10 +47,9 @@ function App() {
               element={<TicketsPage />}
             />
 
-            <Route
-              path="/tickets/new"
-              element={<CreateTicketPage />}
-            />
+            <Route element={<RoleRoute allowedRoles={["Employee"]} />}>
+              <Route path="/tickets/new" element={<CreateTicketPage />} />
+            </Route>
 
             <Route
               path="/tickets/:id"

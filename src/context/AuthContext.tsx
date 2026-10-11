@@ -1,30 +1,13 @@
-import {
-    createContext,
-    useContext,
-    useEffect,
-    useState,
-    type ReactNode,
-} from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { AuthContext } from "./auth-context";
 
 import {
+    getCurrentUser,
     loginUser,
+    registerUser,
     type AuthUser,
+    type RegisterData,
 } from "../services/authService";
-
-interface AuthContextValue {
-    user: AuthUser | null;
-    token: string | null;
-    loading: boolean;
-    login: (
-        email: string,
-        password: string,
-    ) => Promise<void>;
-    logout: () => void;
-}
-
-const AuthContext = createContext<
-    AuthContextValue | undefined
->(undefined);
 
 interface AuthProviderProps {
     children: ReactNode;
@@ -35,31 +18,24 @@ export const AuthProvider = ({
 }: AuthProviderProps) => {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [token, setToken] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(() => Boolean(localStorage.getItem("helpdesk_token")));
 
     useEffect(() => {
         const storedToken =
             localStorage.getItem("helpdesk_token");
-
-        const storedUser =
-            localStorage.getItem("helpdesk_user");
-
-        if (storedToken && storedUser) {
-            try {
-                setToken(storedToken);
-                setUser(JSON.parse(storedUser));
-            } catch (error) {
-                console.error(
-                    "Unable to restore login session.",
-                    error,
-                );
-
-                localStorage.removeItem("helpdesk_token");
-                localStorage.removeItem("helpdesk_user");
-            }
-        }
-
-        setLoading(false);
+        if (!storedToken) return;
+        let active = true;
+        getCurrentUser().then(currentUser => {
+            if (!active) return;
+            setToken(storedToken);
+            setUser(currentUser);
+            localStorage.setItem("helpdesk_user", JSON.stringify(currentUser));
+        }).catch(() => {
+            if (!active) return;
+            localStorage.removeItem("helpdesk_token");
+            localStorage.removeItem("helpdesk_user");
+        }).finally(() => { if (active) setLoading(false); });
+        return () => { active = false; };
     }, []);
 
     const login = async (
@@ -85,6 +61,14 @@ export const AuthProvider = ({
         setUser(response.user);
     };
 
+    const register = async (data: RegisterData) => {
+        const response = await registerUser(data);
+        localStorage.setItem("helpdesk_token", response.token);
+        localStorage.setItem("helpdesk_user", JSON.stringify(response.user));
+        setToken(response.token);
+        setUser(response.user);
+    };
+
     const logout = () => {
         localStorage.removeItem("helpdesk_token");
         localStorage.removeItem("helpdesk_user");
@@ -100,22 +84,11 @@ export const AuthProvider = ({
                 token,
                 loading,
                 login,
+                register,
                 logout,
             }}
         >
             {children}
         </AuthContext.Provider>
     );
-};
-
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-
-    if (!context) {
-        throw new Error(
-            "useAuth must be used inside AuthProvider.",
-        );
-    }
-
-    return context;
 };

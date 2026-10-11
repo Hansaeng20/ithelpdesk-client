@@ -51,7 +51,7 @@ export type AuthorType = "Requester" | "Support";
 
 export interface TicketComment {
     _id: string;
-    ticket: {
+    ticket: string | {
         _id: string;
         ticketNumber: string;
         title: string;

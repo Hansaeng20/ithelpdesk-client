@@ -24,8 +24,17 @@ export const useTickets = () => {
     }, []);
 
     useEffect(() => {
-        fetchTickets();
-    }, [fetchTickets]);
+        let active = true;
+        getTickets().then(response => {
+            if (active) setTickets(response.tickets);
+        }).catch(err => {
+            console.error(err);
+            if (active) setError("Unable to load tickets.");
+        }).finally(() => {
+            if (active) setLoading(false);
+        });
+        return () => { active = false; };
+    }, []);
 
     return {
         tickets,

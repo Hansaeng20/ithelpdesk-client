@@ -1,517 +1,83 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-
-import {
-    deleteTicket,
-    getTicket,
-    updateTicketStatus,
-} from "../services/ticketService";
-
-import { useAuth } from "../context/AuthContext";
-
-import type { Ticket, TicketStatus } from "../types";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../context/useAuth";
+import { createTicketComment, getTicketComments } from "../services/commentService";
+import { deleteTicket, getTicket, updateTicketStatus } from "../services/ticketService";
+import { ErrorState, Icon, LoadingState, PageHeader, PriorityBadge, StatusBadge } from "../components/ui";
+import { formatDate, getSlaState, slaLabel } from "../utils/tickets";
+import type { Ticket, TicketComment, TicketStatus } from "../types";
 
 const TicketDetailsPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-
+    const location = useLocation();
     const { user } = useAuth();
-
+    const isSupport = user?.role === "IT Support";
     const [ticket, setTicket] = useState<Ticket | null>(null);
-
-    const [loading, setLoading] = useState(true);
+    const [comments, setComments] = useState<TicketComment[]>([]);
+    const [loading, setLoading] = useState(Boolean(id));
     const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
-
-    const [deleting, setDeleting] = useState(false);
-
-    const [status, setStatus] = useState<TicketStatus>("Open");
-    const [updatingStatus, setUpdatingStatus] = useState(false);
-
-    const isITSupport = user?.role === "IT Support";
+    const [commentError, setCommentError] = useState("");
+    const [notice, setNotice] = useState((location.state as { notice?: string } | null)?.notice ?? "");
+    const [statusBusy, setStatusBusy] = useState(false);
+    const [deleteBusy, setDeleteBusy] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [message, setMessage] = useState("");
+    const [sending, setSending] = useState(false);
 
     useEffect(() => {
-        const fetchTicket = async () => {
-            if (!id) {
-                setError("Invalid ticket ID.");
-                setLoading(false);
-                return;
-            }
-
-            try {
-                setLoading(true);
-                setError("");
-
-                const response = await getTicket(id);
-
-                setTicket(response.ticket);
-                setStatus(response.ticket.status);
-            } catch (err) {
-                console.error(err);
-                setError("Unable to load this ticket.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchTicket();
+        if (!id) return;
+        let active = true;
+        getTicket(id).then(response => { if (active) setTicket(response.ticket); }).catch(err => { console.error(err); if (active) setError("Unable to load this ticket."); }).finally(() => { if (active) setLoading(false); });
+        getTicketComments(id).then(data => { if (active) setComments(data); }).catch(err => { console.error(err); if (active) setCommentError("Conversation is unavailable right now."); });
+        return () => { active = false; };
     }, [id]);
 
-
-    const handleStatusChange = async () => {
+    const nextStatus: TicketStatus | null = ticket?.status === "Open" ? "In Progress" : ticket?.status === "In Progress" ? "Resolved" : null;
+    const changeStatus = async () => {
+        if (!id || !nextStatus) return;
+        try { setStatusBusy(true); setError(""); const response = await updateTicketStatus(id, nextStatus); setTicket(response.ticket); setNotice(`Status changed to ${nextStatus}.`); }
+        catch (err) { console.error(err); setError("Could not update the status. Please try again."); }
+        finally { setStatusBusy(false); }
+    };
+    const removeTicket = async () => {
         if (!id) return;
-
-        try {
-            setUpdatingStatus(true);
-            setError("");
-            setSuccess("");
-
-            const response = await updateTicketStatus(
-                id,
-                status,
-            );
-
-            setTicket(response.ticket);
-            setStatus(response.ticket.status);
-
-            setSuccess("Ticket status updated successfully.");
-        } catch (err) {
-            console.error(err);
-
-            setError(
-                "Unable to update ticket status. Please check the allowed status transition.",
-            );
-
-            if (ticket) {
-                setStatus(ticket.status);
-            }
-        } finally {
-            setUpdatingStatus(false);
-        }
+        try { setDeleteBusy(true); setError(""); await deleteTicket(id); navigate("/tickets", { replace: true }); }
+        catch (err) { console.error(err); setError("Could not delete this ticket."); setConfirmDelete(false); }
+        finally { setDeleteBusy(false); }
+    };
+    const sendComment = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!id || !message.trim()) return;
+        try { setSending(true); setCommentError(""); const newComment = await createTicketComment(id, message.trim()); setComments(current => [...current, newComment]); setMessage(""); }
+        catch (err) { console.error(err); setCommentError("Message was not sent. Please try again."); }
+        finally { setSending(false); }
     };
 
-    const handleDelete = async () => {
-        if (!id) return;
+    if (loading) return <div className="page"><div className="panel"><LoadingState label="Loading ticket..." /></div></div>;
+    if (!ticket) return <div className="page"><Link to="/tickets" className="text-link mb-5"><Icon name="arrowLeft" size={15} />Back to tickets</Link><ErrorState message={error || (id ? "Ticket not found." : "Invalid ticket ID.")} /></div>;
+    const slaState = getSlaState(ticket.dueAt, ticket.status);
 
-        const confirmed = window.confirm(
-            "Are you sure you want to delete this ticket? This action cannot be undone.",
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        try {
-            setDeleting(true);
-            setError("");
-
-            await deleteTicket(id);
-
-            setSuccess("Ticket deleted successfully.");
-
-            setTimeout(() => {
-                navigate("/tickets");
-            }, 800);
-        } catch (err) {
-            console.error(err);
-            setError("Unable to delete this ticket.");
-        } finally {
-            setDeleting(false);
-        }
-    };
-
-    const formatDate = (date: string) => {
-        return new Date(date).toLocaleString();
-    };
-
-    if (loading) {
-        return (
-            <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-                <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-                    <p className="text-sm text-slate-500">
-                        Loading ticket...
-                    </p>
-                </div>
+    return <div className="page">
+        <Link to="/tickets" className="text-link mb-5"><Icon name="arrowLeft" size={15} />Back to tickets</Link>
+        <PageHeader eyebrow={ticket.ticketNumber} title={ticket.title} description={`Submitted ${formatDate(ticket.createdAt, true)} · ${ticket.category}`} action={<><Link to={`/tickets/${ticket._id}/edit`} className="btn btn-outline"><Icon name="edit" size={16} />Edit</Link><button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)}><Icon name="trash" size={16} />Delete</button></>} />
+        {notice && <div className="success-state mb-5" role="status"><Icon name="check" size={17} />{notice}<button type="button" className="ml-auto" aria-label="Dismiss notification" onClick={() => setNotice("")}><Icon name="close" size={15} /></button></div>}
+        {error && <div className="mb-5"><ErrorState message={error} /></div>}
+        <div className="detail-grid">
+            <div className="section-stack">
+                <section className="panel"><div className="panel-head"><div><h2>Request details</h2><p>The issue as described by the requester</p></div><span className="text-indigo-500"><Icon name="tickets" size={20} /></span></div><div className="panel-body"><p className="text-[13px] leading-7 whitespace-pre-wrap text-slate-600">{ticket.description}</p><div className="info-grid mt-7 pt-6 border-t border-slate-100"><Info label="Requester" value={ticket.requesterName} /><Info label="Email" value={ticket.requesterEmail} /><Info label="Department" value={ticket.department?.name ?? "—"} /><Info label="Category" value={ticket.category} /></div></div></section>
+                {isSupport && <section className="panel"><div className="panel-head"><div><h2>Ticket workflow</h2><p>Move the request through its supported status steps</p></div><Icon name="shield" size={20} className="text-teal-600" /></div><div className="panel-body flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between"><div><StatusBadge status={ticket.status} /><p className="mt-2 text-xs text-slate-500">{nextStatus ? `Next step: ${nextStatus}` : "This ticket is complete."}</p></div>{nextStatus && <button type="button" onClick={changeStatus} disabled={statusBusy} className="btn btn-primary"><Icon name="arrowRight" size={16} />{statusBusy ? "Updating..." : `Move to ${nextStatus}`}</button>}</div></section>}
+                <section className="panel"><div className="panel-head"><div><h2>Conversation</h2><p>Keep updates and context with the ticket</p></div><Icon name="message" size={20} className="text-indigo-500" /></div><div className="panel-body"><div className="space-y-5">{comments.length === 0 ? <p className="text-xs text-slate-500">No updates yet. Start the conversation below.</p> : comments.map(comment => <div key={comment._id} className="flex gap-3"><span className="avatar w-8! h-8! rounded-full! text-[11px]!">{comment.authorName.charAt(0).toUpperCase()}</span><div className="min-w-0 flex-1 rounded-xl bg-slate-50 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-xs text-slate-700">{comment.authorName} <span className="font-medium text-slate-400">· {comment.authorType}</span></strong><span className="text-[10px] text-slate-400">{formatDate(comment.createdAt, true)}</span></div><p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-slate-600">{comment.message}</p></div></div>)}</div>{commentError && <div className="mt-4"><ErrorState message={commentError} /></div>}<form onSubmit={sendComment} className="mt-6 pt-5 border-t border-slate-100"><label htmlFor="comment" className="field-label">Add an update</label><textarea id="comment" className="input" rows={3} maxLength={1000} placeholder="Write a helpful update..." value={message} onChange={event => setMessage(event.target.value)} required /><div className="flex justify-between items-center gap-3 mt-3"><span className="text-[11px] text-slate-400">{message.length}/1000 characters</span><button type="submit" className="btn btn-primary btn-small" disabled={sending || !message.trim()}>{sending ? "Sending..." : "Post update"}<Icon name="arrowRight" size={14} /></button></div></form></div></section>
             </div>
-        );
-    }
-
-    if (error && !ticket) {
-        return (
-            <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-                <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-                    <p className="text-sm text-red-700">
-                        {error}
-                    </p>
-
-                    <Link
-                        to="/tickets"
-                        className="mt-4 inline-block text-sm font-semibold text-blue-600 hover:text-blue-800"
-                    >
-                        ← Back to Tickets
-                    </Link>
-                </div>
-            </div>
-        );
-    }
-
-    if (!ticket) {
-        return null;
-    }
-
-    const isOverdue =
-        new Date(ticket.dueAt).getTime() < Date.now() &&
-        !["Resolved", "Closed", "Cancelled"].includes(
-            ticket.status,
-        );
-
-    return (
-        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-
-            {/* Back */}
-            <div className="mb-6">
-                <Link
-                    to="/tickets"
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                >
-                    ← Back to Tickets
-                </Link>
-            </div>
-
-            {/* Feedback */}
-            {success && (
-                <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                    {success}
-                </div>
-            )}
-
-            {error && (
-                <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
-                </div>
-            )}
-
-            {/* Header */}
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-
-                <div>
-                    <p className="text-sm font-semibold text-blue-600">
-                        {ticket.ticketNumber}
-                    </p>
-
-                    <h1 className="mt-1 text-3xl font-bold text-slate-900">
-                        {ticket.title}
-                    </h1>
-
-                    <p className="mt-2 text-sm text-slate-500">
-                        Created {formatDate(ticket.createdAt)}
-                    </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-
-                    <Link
-                        to={`/tickets/${ticket._id}/edit`}
-                        className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                    >
-                        Edit
-                    </Link>
-
-                    <button
-                        type="button"
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {deleting ? "Deleting..." : "Delete"}
-                    </button>
-
-                </div>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-3">
-
-                {/* Main content */}
-                <div className="space-y-6 lg:col-span-2">
-
-                    {/* Description */}
-                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Ticket Description
-                        </h2>
-
-                        <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-600">
-                            {ticket.description}
-                        </p>
-
-                    </section>
-
-                    {/* Requester */}
-                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Requester Information
-                        </h2>
-
-                        <div className="mt-5 grid gap-5 sm:grid-cols-2">
-
-                            <InfoItem
-                                label="Name"
-                                value={ticket.requesterName}
-                            />
-
-                            <InfoItem
-                                label="Email"
-                                value={ticket.requesterEmail}
-                            />
-
-                            <InfoItem
-                                label="Department"
-                                value={
-                                    ticket.department?.name || "N/A"
-                                }
-                            />
-
-                            <InfoItem
-                                label="Department Code"
-                                value={
-                                    ticket.department?.code || "N/A"
-                                }
-                            />
-
-                        </div>
-
-                    </section>
-
-                    {/* IT SUPPORT CONTROLS */}
-                    {isITSupport && (
-                        <section className="rounded-xl border border-blue-200 bg-blue-50 p-6">
-
-                            <div className="mb-5">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                                    IT Support
-                                </p>
-
-                                <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                                    Ticket Management
-                                </h2>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Manage assignment and ticket status.
-                                </p>
-                            </div>
-
-                            <div className="space-y-6">
-
-
-                                {/* Status */}
-                                <div className="border-t border-blue-200 pt-6">
-
-                                    <label
-                                        htmlFor="status"
-                                        className="mb-2 block text-sm font-medium text-slate-700"
-                                    >
-                                        Ticket Status
-                                    </label>
-
-                                    <div className="flex flex-col gap-3 sm:flex-row">
-
-                                        <select
-                                            id="status"
-                                            value={status}
-                                            onChange={(event) =>
-                                                setStatus(event.target.value as TicketStatus)
-                                            }
-                                            className="input"
-                                            disabled={
-                                                updatingStatus ||
-                                                status === "Resolved" ||
-                                                status === "Cancelled"
-                                            }
-                                        >
-                                            {ticket.status === "Open" && (
-                                                <>
-                                                    <option value="Open">
-                                                        Open
-                                                    </option>
-
-                                                    <option value="In Progress">
-                                                        In Progress
-                                                    </option>
-                                                </>
-                                            )}
-
-                                            {ticket.status === "In Progress" && (
-                                                <>
-                                                    <option value="In Progress">
-                                                        In Progress
-                                                    </option>
-
-                                                    <option value="Resolved">
-                                                        Resolved (Closed)
-                                                    </option>
-                                                </>
-                                            )}
-
-                                            {ticket.status === "Resolved" && (
-                                                <option value="Resolved">
-                                                    Resolved (Closed)
-                                                </option>
-                                            )}
-
-                                            {ticket.status === "Cancelled" && (
-                                                <option value="Cancelled">
-                                                    Cancelled
-                                                </option>
-                                            )}
-                                        </select>
-
-                                        <button
-                                            type="button"
-                                            onClick={handleStatusChange}
-                                            disabled={
-                                                updatingStatus ||
-                                                status === ticket.status
-                                            }
-                                            className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            {updatingStatus
-                                                ? "Updating..."
-                                                : "Update Status"}
-                                        </button>
-
-                                    </div>
-
-                                    <p className="mt-2 text-xs text-slate-500">
-                                        The system will reject invalid status
-                                        transitions.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-                        </section>
-                    )}
-
-                </div>
-
-                {/* Sidebar */}
-                <aside className="space-y-6">
-
-                    {/* Status */}
-                    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Ticket Status
-                        </h2>
-
-                        <div className="mt-5 space-y-5">
-
-                            <InfoItem
-                                label="Status"
-                                value={
-                                    ticket.status === "Resolved"
-                                        ? "Resolved (Closed)"
-                                        : ticket.status
-                                }
-                            />
-
-                            <InfoItem
-                                label="Priority"
-                                value={ticket.priority}
-                            />
-
-                            <InfoItem
-                                label="Category"
-                                value={ticket.category}
-                            />
-
-
-                        </div>
-
-                    </section>
-
-                    {/* SLA */}
-                    <section
-                        className={`rounded-xl border p-6 shadow-sm ${isOverdue
-                            ? "border-red-200 bg-red-50"
-                            : "border-slate-200 bg-white"
-                            }`}
-                    >
-
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            SLA Information
-                        </h2>
-
-                        <div className="mt-5 space-y-5">
-
-                            <InfoItem
-                                label="SLA"
-                                value={`${ticket.slaHours} hours`}
-                            />
-
-                            <InfoItem
-                                label="Due At"
-                                value={formatDate(ticket.dueAt)}
-                            />
-
-                            <div>
-                                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                    SLA Status
-                                </p>
-
-                                <p
-                                    className={`mt-1 text-sm font-semibold ${isOverdue
-                                        ? "text-red-700"
-                                        : "text-green-700"
-                                        }`}
-                                >
-                                    {isOverdue
-                                        ? "Overdue"
-                                        : "Within SLA"}
-                                </p>
-                            </div>
-
-                            {ticket.resolvedAt && (
-                                <InfoItem
-                                    label="Resolved At"
-                                    value={formatDate(ticket.resolvedAt)}
-                                />
-                            )}
-
-                        </div>
-
-                    </section>
-
-                </aside>
-
-            </div>
+            <aside className="section-stack content-start">
+                <section className="panel"><div className="panel-head"><h2>At a glance</h2></div><div className="panel-body space-y-5"><div className="flex items-center justify-between gap-3"><span className="info-label">Status</span><StatusBadge status={ticket.status} /></div><div className="flex items-center justify-between gap-3"><span className="info-label">Priority</span><PriorityBadge priority={ticket.priority} /></div><Info label="Ticket ID" value={ticket.ticketNumber} /><Info label="Last updated" value={formatDate(ticket.updatedAt, true)} /></div></section>
+                <section className="panel"><div className="panel-head"><h2>SLA timeline</h2><Icon name="clock" size={19} className="text-indigo-500" /></div><div className="panel-body"><span className={`sla-pill ${slaState}`}>{slaLabel(ticket.dueAt, ticket.status)}</span><div className="info-grid mt-5"><Info label="Target" value={`${ticket.slaHours} hours`} /><Info label="Due date" value={formatDate(ticket.dueAt, true)} /></div>{ticket.resolvedAt && <div className="mt-5"><Info label="Resolved" value={formatDate(ticket.resolvedAt, true)} /></div>}</div></section>
+            </aside>
         </div>
-    );
+        {confirmDelete && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setConfirmDelete(false); }}><div className="panel w-full max-w-md p-6" role="alertdialog" aria-modal="true" aria-labelledby="delete-title" aria-describedby="delete-description"><span className="inline-grid place-items-center w-11 h-11 rounded-xl bg-rose-50 text-rose-600"><Icon name="alert" size={22} /></span><h2 id="delete-title" className="mt-4 text-lg font-extrabold">Delete this ticket?</h2><p id="delete-description" className="mt-2 text-sm leading-6 text-slate-500">This permanently removes {ticket.ticketNumber}. You cannot undo this action.</p><div className="flex justify-end gap-2 mt-6"><button type="button" className="btn btn-outline" onClick={() => setConfirmDelete(false)}>Keep ticket</button><button type="button" className="btn btn-danger" onClick={removeTicket} disabled={deleteBusy}>{deleteBusy ? "Deleting..." : "Delete ticket"}</button></div></div></div>}
+    </div>;
 };
 
-interface InfoItemProps {
-    label: string;
-    value: string;
-}
-
-const InfoItem = ({
-    label,
-    value,
-}: InfoItemProps) => {
-    return (
-        <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                {label}
-            </p>
-
-            <p className="mt-1 text-sm font-medium text-slate-900">
-                {value}
-            </p>
-        </div>
-    );
-};
+function Info({ label, value }: { label: string; value: string }) { return <div><span className="info-label">{label}</span><span className="info-value">{value}</span></div>; }
 
 export default TicketDetailsPage;
