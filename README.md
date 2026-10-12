@@ -1,40 +1,15 @@
-# IT Helpdesk client
+IT Helpdesk Client
 
-A React, TypeScript, Vite, and Tailwind workspace for employees and IT Support.
+A web-based IT Helpdesk system built with React, TypeScript, Vite, and Tailwind CSS to streamline IT support operations and employee ticket management. The application allows employees to submit and track support requests, while IT Support personnel can manage tickets, monitor service-level agreement (SLA) deadlines, and view support analytics.
 
-## Run locally
+Key Features
 
-From the `IT_Desk_Project` folder, start the API in `ithelpdesk-server` first. It requires MongoDB and the values in its `.env.example` file.
+- Employee registration and ticket management
+- Ticket creation, editing, and status tracking
+- Priority-based ticket handling
+- IT Support ticket queue and status management
+- SLA deadline monitoring and overdue request tracking
+- Department management and support analytics
+- REST API integration with MongoDB and JWT-based authentication
 
-```powershell
-cd .\ithelpdesk-server
-npm install
-Copy-Item .env.example .env
-# Edit .env: set MONGO_URI and JWT_SECRET (and support credentials if needed).
-npm run seed:departments
-npm run dev
-```
-
-In a second terminal:
-
-```powershell
-cd .\ithelpdesk-client
-npm install
-npm run dev
-```
-
-Open the local URL printed by Vite, usually `http://localhost:5173`. The development server proxies `/api` to `http://localhost:5000`. For a deployed client with an API on another origin, set `VITE_API_URL` before building. See `.env.example`.
-
-## Checks
-
-```powershell
-npm run build
-npm run lint
-```
-
-## Roles
-
-- Employees can register, submit requests, view and edit their own tickets, and post updates. Ticket priority is set on creation and then managed by IT Support.
-- IT Support can view the full queue, advance ticket status, monitor overdue requests, and view analytics and departments.
-
-Ticket status follows `Open → In Progress → Resolved`. SLA deadlines are calculated by the API from priority.
+The system follows a structured ticket workflow: Open → In Progress → Resolved, helping organize support requests and improve visibility into IT service operations.
